@@ -36,6 +36,8 @@ def lexer(contents):
     if (data.error_message):
         # for token in data.token_array:
         #     print(token)
+        # error_msg = "Error: " + data.error_message + " on line " + str(data.line_number)
+        # raise Exception(error_msg)
         print("Error: " + data.error_message + " on line " + str(data.line_number))
     else:
         data.token_array.append(['ENDOFFILE', None])

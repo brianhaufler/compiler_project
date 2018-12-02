@@ -48,3 +48,47 @@ Changes
 - In parser.py, I initialized parser_local_table on line 9. Additionally I added the semantic actions to the grammar
     and added an option for that to be the next token that is popped "elif (isinstance(symbol, int)):" on line 30.
     There's also a peek_prev_token method in the ParserData class
+
+
+Semantic Actions 3 Update:
+----------------------------
+Default test file is "phase3-1.txt". Will run if command is "python3 compiler.py" with no listed test file.
+
+Moved the Semantic Actions into their own file semantic_actions.py. Also created quadruple.py for the
+quadruples and the quadruple class
+
+Initialized the local table and the global table within the semantic actions class
+Also created a boolean value "print_parse_trace" in the ParseData class. This is initialized to True,
+but can be changed to False if we do not want to see the parseData
+
+There was an error in semantic actions 2 that I wasn't able to fix yet. When an array statement is used
+(ex: x[b] := c), the type of b is compared to c when it should be the type of x compared to c. I will try to fix
+this before the next phase
+
+Semantic Actions 3 Update (Part 2):
+------------------------------------
+The initial Semantic Actions 3 was a bit sloppy, so I decided to submit this as well. I don't
+expect this to be graded (instead of the previous submission), but I wanted you to know that
+I've corrected most of those errors.
+
+Changes:
+- Get_opcode can now take in RELOPs and "AND" and "OR"
+- Fixed multiple "Etype" instead of "EType errors"
+- Fixed multiple ".getNextQuad" instead of ".getNextQuad()" errors
+- Put several "self.semantic_stack.append(EType.ARITHMETIC)"s in the right place
+    (before some were in else statements when they shouldn't have been or vice versa)
+- Fixed the merge function (Append doesn't work on two lists).
+- The previously noted error in semantic actions 2 (regarding array statements) is now fixed.
+    I'm not sure if that's due to the newly implemented actions in part 3.
+- Added self.actions_tested = [] in Semantic Actions class for debugging purposes
+
+For the test file "phase3-8.txt", it breaks because there is an extra "}" at the
+end of the file when there shouldn't be. The program can technically still run
+even if that } remains there, so I'm still deciding whether I want to allow the
+file to work.
+
+
+
+
+
+

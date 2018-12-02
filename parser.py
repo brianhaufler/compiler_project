@@ -3,17 +3,22 @@ import symbol_table
 def parser(token_array, semantic_actions_class):
     # Goal is at the top of the stack
     data = ParseData(['ENDOFFILE', "<Goal>"])
-    # iteration = 1
-    # production_msg = ""
 
-    parser_local_table = symbol_table.SymbolTable(50)
+    # Print variables
+    iteration = 1
+    dump_msg = ""
+
+    # parser_local_table = symbol_table.SymbolTable(50)
+
+
 
 
     # Runs until parse stack is empty
     while(data.stack):
+        # print(data.stack)
         # print(token_array)
-        # print(">>-  " + str(iteration) + " -<<")
-        # print("Stack ::==> " + str(stack))
+        # print(data.token_history)
+        dump_msg += ">>-  " + str(iteration) + "  -<<\n" + "Stack ::==> " + str(data.stack) + "\n"
         symbol = data.stack.pop()
         next_token = token_array[0][0]
         # Is symbol terminal?
@@ -22,14 +27,14 @@ def parser(token_array, semantic_actions_class):
             if (symbol == next_token):
                 # Pop token and add to token history
                 data.token_history.append(token_array.pop(0))
-                # production_msg = "* MATCH *    {consume tokens}"
+                production_msg = "* MATCH *    {consume tokens}"
             # No it doesn't
             else:
                 return "Error: Unexpected " + str(next_token)
         # Symbol is semantic action
         elif (isinstance(symbol, int)):
             semantic_actions_class.execute(symbol, data.peek_prev_token())
-            # production_msg = "# SEMANTIC ACTION #      [" + symbol + "]"
+            production_msg = "# SEMANTIC ACTION #      [" + str(symbol) + "]"
 
         # Symbol is non-terminal
         else:
@@ -46,18 +51,24 @@ def parser(token_array, semantic_actions_class):
                 return "Error: Unexpected " + str(next_token)
             # Empty production
             elif (production_num < 0):
-                # production_msg = "@ EPSILON @   [ " + str(production_num) + " ] " + symbol + " ::= @ EPSILON @"
+                production_msg = "@ EPSILON @   [ " + str(production_num) + " ] " + symbol + " ::= @ EPSILON @"
                 pass
             # Valid production. Find production and push onto stack
             else:
                 production = data.rhs_table[production_num]
                 data.stack += production
-                # production_msg = "$ PUSH $   [ " + str(production_num) + " ] " + symbol + " ::= " + str(production)
-        # print("Popped " + str(symbol) + " with token " + str(next_token) + " -> " + production_msg)
-        # print(" ")
-        # iteration += 1
+                production_msg = "$ PUSH $   [ " + str(production_num) + " ] " + symbol + " ::= " + str(production)
+        dump_msg += "Popped " + str(symbol) + " with token " + str(next_token) + " -> " + production_msg + "\n"
 
-    return "Accept"
+        if (data.print_parse_trace):
+            print(dump_msg)
+        dump_msg = ""
+        iteration += 1
+
+    print(semantic_actions_class.actions_tested)
+    semantic_actions_class.quadruples.print_quads()
+
+    return "! Accept !"
 
 
 def dump_stack(parse_data):
@@ -66,6 +77,7 @@ def dump_stack(parse_data):
 
 class ParseData:
     def __init__(self, initial_stack):
+        self.print_parse_trace = True
         self.stack = initial_stack
         self.token_history = []
         # Used to index into parse table
@@ -156,7 +168,7 @@ class ParseData:
             28: [],
             29: ["<elementary-statement>"],
             30: ["<else-clause>", "<statement>", "THEN", 22, "<expression>", "IF"],
-            31: ["<statement>", "DO", 25, "<expression>", 24, "WHILE"],
+            31: [26, "<statement>", "DO", 25, "<expression>", 24, "WHILE"],
             32: [28, "<statement>", 27, "ELSE"],
             33: [29],
             34: ["<es-tail>", 30, "IDENTIFIER"],

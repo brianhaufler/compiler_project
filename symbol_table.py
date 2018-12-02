@@ -21,6 +21,8 @@ class SymbolTable():
 
     def dump_table(self):
         print(self.table)
+        for entry in self.table:
+            print(entry + ": " + str(self.table[entry].__dict__))
 
 
 class SymbolTableEntry():
@@ -34,44 +36,52 @@ class SymbolTableEntry():
         self.isArray = isArray
         self.isReserved = isReserved
 
+    def print_entry(self):
+        print(self.__dict__)
+
 
 class ArrayEntry(SymbolTableEntry):
-    def __init__(self, name, address, token_type, upper_bound, lower_bound):
+    def __init__(self, name, address, token_type, upper_bound, lower_bound, is_global):
         SymbolTableEntry.__init__(self, isArray=True)
         self.name = name
         self.address = address
-        self.token_type = token_type
+        self.type = token_type
         self.upper_bound = upper_bound
         self.lower_bound = lower_bound
+        self.is_global = is_global
 
 
 class ConstantEntry(SymbolTableEntry):
-    def __init__(self, name, token_type):
+    def __init__(self, name, token_type, is_global):
         SymbolTableEntry.__init__(self)
         self.name = name
-        self.token_type = token_type
+        self.type = token_type
+        self.is_global = is_global
 
 class FunctionEntry(SymbolTableEntry):
-    def __init__(self, name, number_of_parameters, parameter_info, result):
+    def __init__(self, name, number_of_parameters, parameter_info, result, is_global):
         SymbolTableEntry.__init__(self, isFunction=True)
         self.name = name
         self.number_of_parameters = number_of_parameters
         self.parameter_info = parameter_info
         self.result = result
+        self.is_global = is_global
 
 class ProcedureEntry(SymbolTableEntry):
-    def __init__(self, name, number_of_parameters, parameter_info):
+    def __init__(self, name, number_of_parameters, parameter_info, is_global):
         SymbolTableEntry.__init__(self, isProcedure=True)
         self.name = name
         self.number_of_parameters = number_of_parameters
         self.parameter_info = parameter_info
+        self.is_global = is_global
 
 class VariableEntry(SymbolTableEntry):
-    def __init__(self, name, address, type):
+    def __init__(self, name, address, type, is_global):
         SymbolTableEntry.__init__(self, isVariable=True)
         self.name = name
         self.address = address
         self.type = type
+        self.is_global = is_global
 
 class IODeviceEntry(SymbolTableEntry):
     def __init__(self, name):
