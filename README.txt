@@ -87,6 +87,17 @@ end of the file when there shouldn't be. The program can technically still run
 even if that } remains there, so I'm still deciding whether I want to allow the
 file to work.
 
+Semantic Actions 4:
+--------------------
+- Default test file is "ultimate.txt".
+- Compiler now outputs the quads at the end.
+- Removed use of "int" and "float". Only using "INTEGER" and "REAL" strings now.
+- In some actions, we now prioritize looking for symbol table entries in the local table. If that isn't found
+    we then look in the global table.
+- Had problems checking parameter of symbol table entries if they weren't actually symbol table entries.
+    (Ex: Checking "isParameter" of a token). Now use "isinstance" function instead.
+- Changes to "peek_stack_type" function in semantic_actions.py
+
 
 
 

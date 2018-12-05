@@ -10,9 +10,6 @@ def parser(token_array, semantic_actions_class):
 
     # parser_local_table = symbol_table.SymbolTable(50)
 
-
-
-
     # Runs until parse stack is empty
     while(data.stack):
         # print(data.stack)
@@ -65,10 +62,11 @@ def parser(token_array, semantic_actions_class):
         dump_msg = ""
         iteration += 1
 
-    print(semantic_actions_class.actions_tested)
-    semantic_actions_class.quadruples.print_quads()
+    # print(semantic_actions_class.actions_tested)
 
-    return "! Accept !"
+    print("! Accept !")
+
+    semantic_actions_class.quadruples.print_quads()
 
 
 def dump_stack(parse_data):

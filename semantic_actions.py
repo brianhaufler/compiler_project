@@ -116,12 +116,16 @@ class SemanticAction():
         if (semantic_action_num in self.valid_semantic_actions):
             # For debugging purposes
             self.actions_tested.append(semantic_action_num)
+            # print(sorted(self.actions_tested))
+            # print(self.actions_tested)
+
             # Finds semantic_action method within class
+            function_name = "action_" + str(semantic_action_num)
+
             try:
-                function_name = "action_" + str(semantic_action_num)
+                method_to_call = getattr(self, function_name)
             except:
                 print("Error: Semantic_Action " + str(semantic_action_num) + " is not yet implemented")
-            method_to_call = getattr(self, function_name)
 
             # And then calls it
             method_to_call(prev_token)
@@ -132,11 +136,23 @@ class SemanticAction():
 
     def peek_stack_type(self):
         # Returns None if stack is empty, otherwise the type of the top of the stack
-        return None if not self.semantic_stack else self.semantic_stack[-1][0]
+        if (not self.semantic_stack):
+            return None
+
+        popped = self.semantic_stack[-1]
+        if (not isinstance(popped, (list, tuple))):
+            if (isinstance(popped, symbol_table.ArrayEntry) or
+                isinstance(popped, symbol_table.ConstantEntry) or
+                isinstance(popped, symbol_table.VariableEntry)):
+                return popped.type
+            else:
+                return None
+        else:
+            return popped[0]
+
 
     def peek_stack(self):
         return None if not self.semantic_stack else self.semantic_stack[-1]
-
 
     ## --------------------
     ## HELPER FUNCTIONS
@@ -151,20 +167,20 @@ class SemanticAction():
     # Written "INTEGER" or "REAL" is a quick fix.
     # Might need to change it so it's originally inserted as int or float in symbol table
     def typecheck(self, id_1, id_2):
-        if id_1.type is int or id_1.type == "INTEGER":
-            if id_2.type is int or id_2.type == "INTEGER":
+        if id_1.type == "INTEGER":
+            if id_2.type == "INTEGER":
                 return 0
             # id_2 is real
-            elif id_2.type is float or id_2.type == "REAL":
+            elif id_2.type == "REAL":
                 return 3
             else:
                 raise Exception("Neither int nor real in typecheck")
         # id_1 is real
-        elif id_1.type is float or id_1.type == "REAL":
-            if id_2.type is int or id_2.type == "INTEGER":
+        elif id_1.type == "REAL":
+            if id_2.type == "INTEGER":
                 return 2
             # id_2 is real
-            elif id_2.type is float or id_2.type == "REAL":
+            elif id_2.type == "REAL":
                 return 1
             else:
                 raise Exception("Neither int nor real in typecheck")
@@ -375,13 +391,13 @@ class SemanticAction():
 
         self.is_insert = False
 
-        self.generate("call","main", 0)
+        self.generate("call", "main", 0)
         self.generate("exit")
 
     def action_11(self, prev_token):
         self.is_global = True
         # Delete local symbol table
-        self.local_table = self.local_table = symbol_table.SymbolTable(50)
+        self.local_table = symbol_table.SymbolTable(50)
         self.current_function = None
         self.backpatch(self.local_store, self.local_memory)
         self.generate("free", self.local_memory)
@@ -395,16 +411,15 @@ class SemanticAction():
 
     def action_15(self, prev_token):
         # Create variable to store result of function
-        result = self.create(prev_token[1] + "_RESULT", int)
+        result = self.create(prev_token[1] + "_RESULT", "INTEGER")
 
         # Set result tag of the variable entry class
         result.isFunctionResult = True
 
         # Create new function entry with name from the token
         # from the parser, and the result variable just created
-        id = symbol_table.FunctionEntry(prev_token[1], result)
-
-        self.global_table.insert(id)
+        id = symbol_table.FunctionEntry(prev_token[1], 0, [], result, self.is_global)
+        self.global_table.insert(id.name, id)
         self.is_global = False
         self.local_memory = 0
         self.current_function = id
@@ -419,14 +434,14 @@ class SemanticAction():
 
         # Potential problem here
         # Sets the type of the result variable of id
-        id.result.type = id.type
+        id.result.type = type[0]
         self.current_function = id
 
     # Create a new procedure entry with the name of the token
     # from the parser
     def action_17(self, prev_token):
-        id = symbol_table.ProcedureEntry(prev_token[1])
-        self.global_table.insert(id)
+        id = symbol_table.ProcedureEntry(prev_token[1], 0, [], self.is_global)
+        self.global_table.insert(id.name, id)
         self.is_global = False
         self.local_memory = 0
         self.current_function = id
@@ -450,8 +465,9 @@ class SemanticAction():
         upper_bound = -1
         lower_bound = -1
         if (self.is_array):
-            upper_bound = int(self.semantic_stack.pop())
-            lower_bound = int(self.semantic_stack.pop())
+            # Pops two tokens
+            upper_bound = int(self.semantic_stack.pop()[1])
+            lower_bound = int(self.semantic_stack.pop()[1])
 
         # Tokens on the stack, which represent parameters,
         # must be added from the bottom-most id to the top-most
@@ -459,18 +475,19 @@ class SemanticAction():
 
         # As the ids are popped off the stack, push them onto
         # the new stack to reverse the order
-        while (self.peek_stack()[0] == "IDENTIFIER"):
+        # Change once this is converted to token
+        while (isinstance(self.peek_stack(), (list, tuple)) and self.peek_stack()[0] == "IDENTIFIER"):
             parameters.append(self.semantic_stack.pop())
 
         # While parameters isn't empty
         while (parameters):
             param = parameters.pop()
             if (self.is_array):
-                var = symbol_table.ArrayEntry(param[1], self.local_memory, type[0], upper_bound, lower_bound)
+                var = symbol_table.ArrayEntry(param[1], self.local_memory, type[0], upper_bound, lower_bound, self.is_global)
             else:
-                var = symbol_table.VariableEntry(param[1], self.local_memory, type)
+                var = symbol_table.VariableEntry(param[1], self.local_memory, type[0], self.is_global)
             var.isParameter = True
-            self.local_table.insert(var)
+            self.local_table.insert(var.name, var)
             # Current function is either procedure or function entry
             self.current_function.parameter_info.append(var)
             self.local_memory += 1
@@ -480,14 +497,8 @@ class SemanticAction():
         self.is_array = False
 
 
-
-        return
-
-
     def action_22(self, prev_token):
-        print(prev_token)
         etype = self.semantic_stack.pop()
-        print(etype)
         if (etype != EType.RELATIONAL):
             raise Exception("Etype mismatch error in action_22")
         efalse = self.semantic_stack.pop()
@@ -544,12 +555,16 @@ class SemanticAction():
         self.backpatch_list(efalse, self.quadruples.get_next_quad())
 
     def action_30(self, prev_token):
-        # print(prev_token)
-        # Lookup token by value?
-        id = self.global_table.lookup(prev_token[1])
+        # This prioritizes local declarations over global declarations. But if we can't
+        id = self.local_table.lookup(prev_token[1])
+        if (id is None):
+            id = self.global_table.lookup(prev_token[1])
 
         if (id is None):
             raise Exception("Couldn't find id in action_30")
+
+
+
         self.semantic_stack.append(id)
         self.semantic_stack.append(EType.ARITHMETIC)
 
@@ -557,6 +572,7 @@ class SemanticAction():
         etype = self.semantic_stack.pop()
         if (etype != EType.ARITHMETIC):
             raise Exception("Etype mismatch error")
+
 
         symbol_table_entry_2 = self.semantic_stack.pop()
         # Offset implemented in later actions
@@ -570,7 +586,7 @@ class SemanticAction():
 
         if (typecheck_value == 2):
             # No reals in python, so we use float
-            temp_entry = self.create("temp", float)
+            temp_entry = self.create("temp", "REAL")
             self.generate("ltof", symbol_table_entry_2, temp_entry)
             if (offset == None):
                 self.generate("move", temp_entry, symbol_table_entry_1)
@@ -602,8 +618,8 @@ class SemanticAction():
             raise Exception("type mismatch error in action_33")
 
         array = self.peek_stack()
-        temp1 = self.create("temp", int)
-        temp2 = self.create("temp", int)
+        temp1 = self.create("temp", "INTEGER")
+        temp2 = self.create("temp", "INTEGER")
         self.generate("move", array.lower_bound, temp1)
         self.generate("sub", id, temp1, temp2)
         self.semantic_stack.append(temp2)
@@ -619,6 +635,7 @@ class SemanticAction():
 
     def action_35(self, prev_token):
         etype = self.semantic_stack.pop()
+        # id is a procedure entry
         id = self.peek_stack()
         self.semantic_stack.append(etype)
         self.param_count.append(0)
@@ -638,7 +655,11 @@ class SemanticAction():
 
         id = self.peek_stack()
         # if id is not variable, constant, function result, or array
-        if (not (id.isVariable or isinstance(id, symbol_table.ConstantEntry) or id.isFunctionResult or id.isArray)):
+        # Need something to catch error if id doesn't have .isFunctionResult attribute
+        if (not (isinstance(id, symbol_table.VariableEntry) or
+                 isinstance(id, symbol_table.ConstantEntry) or
+                 isinstance(id, symbol_table.ArrayEntry) or
+                id.isFunctionResult)):
             raise Exception("Bad param type error in action_37")
 
         # increment top of param count
@@ -646,23 +667,27 @@ class SemanticAction():
 
         # Find name of procedure/function on the bottom of the stack
         parameters = []
-        while (not (self.peek_stack().isProcedure or self.peek_stack().isFunction)):
+        while (not (isinstance(self.peek_stack(), symbol_table.ProcedureEntry) or
+                    isinstance(self.peek_stack(), symbol_table.FunctionEntry))):
             parameters.append(self.semantic_stack.pop())
 
         # func_id is a procedure or function entry
         func_id = self.peek_stack()
+
         # while parameters isn't empty
         while (parameters):
             self.semantic_stack.append(parameters.pop())
 
-        if (func_id != "READ" and func_id != "WRITE"):
-            if (self.param_count[-1] > self.number_of_parameters):
+        if (func_id.name != "READ" and func_id.name != "WRITE"):
+            if (self.param_count[-1] > func_id.number_of_parameters):
                 raise Exception("Wrong number of parameters in action_37")
             param = self.param_stack[-1][self.next_param]
+            # Change later when we convert all "int"s to "INTEGER"
             if (id.type != param.type):
                 raise Exception("Bad param type in action_37")
             if (param.isArray):
-                if (id.lower_bound != param.lower_bound or id.lower_bound != param.lower_bound):
+                if (id.lower_bound != param.lower_bound or
+                        id.upper_bound != param.upper_bound):
                     raise Exception("Bad param type in action_37")
 
             self.next_param += 1
@@ -690,11 +715,11 @@ class SemanticAction():
         typecheck_value = self.typecheck(id1, id2)
 
         if (typecheck_value == 2):
-            temp = self.create("temp", float)
+            temp = self.create("temp", "REAL")
             self.generate("ltof", id2, temp)
             self.generate(opcode, id1, temp, "_")
         elif (typecheck_value == 3):
-            temp = self.create("temp", float)
+            temp = self.create("temp", "REAL")
             self.generate("ltof", id1, temp)
             self.generate(opcode, temp, id2, "_")
         else:
@@ -722,7 +747,7 @@ class SemanticAction():
         # ["UNARYMINUS", None]
         if (sign[0] == "UNARYMINUS"):
             temp_entry = self.create("temp", id.type)
-            if (id.type == int):
+            if (id.type == "INTEGER"):
                 self.generate("uminus", id, temp_entry)
             else:
                 self.generate("fuminus", id, temp_entry)
@@ -777,26 +802,26 @@ class SemanticAction():
             typecheck_value = self.typecheck(id1, id2)
 
             if (typecheck_value == 0):
-                temp_entry = self.create("temp", int)
+                temp_entry = self.create("temp", "INTEGER")
                 self.generate(opcode, id1, id2, temp_entry)
                 self.semantic_stack.append(temp_entry)
 
             elif (typecheck_value == 1):
-                temp_entry = self.create("temp", float)
+                temp_entry = self.create("temp", "REAL")
                 self.generate("f" + opcode, id1, id2, temp_entry)
                 self.semantic_stack.append(temp_entry)
 
             elif (typecheck_value == 2):
-                temp_entry1 = self.create("temp", float)
-                temp_entry2 = self.create("temp", float)
+                temp_entry1 = self.create("temp", "REAL")
+                temp_entry2 = self.create("temp", "REAL")
                 self.generate("ltof", id2, temp_entry1)
                 self.generate("f" + opcode, id1, temp_entry1, temp_entry2)
                 self.semantic_stack.append(temp_entry2)
 
             elif (typecheck_value == 3):
-                temp_entry1 = self.create("temp", float)
-                temp_entry2 = self.create("temp", float)
-                self.generate("ltof", id1, temp_entry11)
+                temp_entry1 = self.create("temp", "REAL")
+                temp_entry2 = self.create("temp", "REAL")
+                self.generate("ltof", id1, temp_entry1)
                 self.generate("f" + opcode, temp_entry1, id2, temp_entry2)
                 self.semantic_stack.append(temp_entry2)
 
@@ -850,42 +875,42 @@ class SemanticAction():
 
             if (typecheck_value == 0):
                 if (opcode == "MOD"):
-                    temp1 = self.create("temp", int)
-                    temp2 = self.create("temp", int)
-                    temp3 = self.create("temp", int)
+                    temp1 = self.create("temp", "INTEGER")
+                    temp2 = self.create("temp", "INTEGER")
+                    temp3 = self.create("temp", "INTEGER")
                     self.generate("div", id1, id2, temp1)
                     self.generate("mul", id2, temp1, temp2)
                     self.generate("sub", id1, temp2, temp3)
                     self.semantic_stack.append(temp3)
                 elif (opcode == "div"):
-                    temp1 = self.create("temp", float)
-                    temp2 = self.create("temp", float)
-                    temp3 = self.create("temp", float)
+                    temp1 = self.create("temp", "REAL")
+                    temp2 = self.create("temp", "REAL")
+                    temp3 = self.create("temp", "REAL")
                     self.generate("ltof", id1, temp1)
                     self.generate("ltof", id2, temp2)
                     self.generate("fdiv", temp1, temp2, temp3)
                     self.semantic_stack.append(temp3)
                 else:
-                    temp_entry = self.create("temp", int)
+                    temp_entry = self.create("temp", "INTEGER")
                     self.generate(opcode, id1, id2, temp_entry)
                     self.semantic_stack.append(temp_entry)
 
             elif (typecheck_value == 1):
-                temp_entry = self.create("temp", float)
+                temp_entry = self.create("temp", "REAL")
                 self.generate("f" + opcode, id1, id2, temp_entry)
                 self.semantic_stack.append(temp_entry)
 
             elif (typecheck_value == 2):
-                temp_entry1 = self.create("temp", float)
-                temp_entry2 = self.create("temp", float)
+                temp_entry1 = self.create("temp", "REAL")
+                temp_entry2 = self.create("temp", "REAL")
                 self.generate("ltof", id2, temp_entry1)
                 self.generate("f" + opcode, id1, temp_entry1, temp_entry2)
                 self.semantic_stack.append(temp_entry2)
 
             elif (typecheck_value == 3):
-                temp_entry1 = self.create("temp", float)
-                temp_entry2 = self.create("temp", float)
-                self.generate("ltof", id1, temp_entry11)
+                temp_entry1 = self.create("temp", "REAL")
+                temp_entry2 = self.create("temp", "REAL")
+                self.generate("ltof", id1, temp_entry1)
                 self.generate("f" + opcode, temp_entry1, id2, temp_entry2)
                 self.semantic_stack.append(temp_entry2)
 
@@ -894,15 +919,17 @@ class SemanticAction():
     def action_46(self, prev_token):
         token_type = prev_token[0]
         token_value = prev_token[1]
+
         if (token_type == "IDENTIFIER"):
-            # Look for token in global or local symbol table
-            if (self.is_global):
+            # Look for token in global or local symbol table. Prioritize local declarations
+            id = self.local_table.lookup(token_value)
+            if (id == None):
                 id = self.global_table.lookup(token_value)
-            else:
-                id = self.local_table.lookup(token_value)
+
             # if token not found...
             if (id == None):
                 raise Exception("Undeclared variable error in action 46")
+
             self.semantic_stack.append(id)
         elif (token_type == "INTCONSTANT" or token_type == "REALCONSTANT"):
             # Look for token in constant symbol table
@@ -911,9 +938,9 @@ class SemanticAction():
             # if token not found...
             if (id == None):
                 if (token_type == "INTCONSTANT"):
-                    id = symbol_table.ConstantEntry(token_value, int, self.is_global)
+                    id = symbol_table.ConstantEntry(token_value, "INTEGER", self.is_global)
                 elif (token_type == "REALCONSTANT"):
-                    id = symbol_table.ConstantEntry(token_value, float, self.is_global)
+                    id = symbol_table.ConstantEntry(token_value, "REAL", self.is_global)
                 self.constant_table.insert(token_value, id)
 
             self.semantic_stack.append(id)
@@ -966,7 +993,9 @@ class SemanticAction():
         parameters = []
 
         # for each parameter on the stack
-        while (self.peek_stack().isArray or isinstance(self.peek_stack(), symbol_table.ConstantEntry)or self.peek_stack().isVariable):
+        while (isinstance(self.peek_stack(), symbol_table.ArrayEntry) or
+               isinstance(self.peek_stack(), symbol_table.ConstantEntry) or
+               isinstance(self.peek_stack(), symbol_table.VariableEntry)):
             parameters.append(self.semantic_stack.pop())
 
         # generate code for each of the parameters
@@ -985,6 +1014,7 @@ class SemanticAction():
         self.generate("call", id.name, num_params)
         self.param_stack.pop()
         self.next_param = 0
+
         temp = self.create("temp", id.result.type)
         self.generate("move", id.result, temp)
         self.semantic_stack.append(temp)
@@ -994,7 +1024,9 @@ class SemanticAction():
     def action_51(self, prev_token):
         # get all of the parameters on the stack
         parameters = []
-        while (isinstance(self.peek_stack(), symbol_table.ArrayEntry), isinstance(self.peek_stack(), symbol_table.ConstantEntry), isinstance(self.peek_stack(), symbol_table.VariableEntry)):
+        while (isinstance(self.peek_stack(), symbol_table.ArrayEntry) or
+                isinstance(self.peek_stack(), symbol_table.ConstantEntry) or
+                isinstance(self.peek_stack(), symbol_table.VariableEntry)):
             parameters.append(self.semantic_stack.pop())
 
         etype = self.semantic_stack.pop()
@@ -1028,12 +1060,12 @@ class SemanticAction():
     def action_51READ(self, prev_token):
         # For each parameter on the stack in reverse order
         parameters = []
-        while (isinstance(self.peek_stack()), symbol_table.VariableEntry):
+        while (isinstance(self.peek_stack(), symbol_table.VariableEntry)):
             parameters.append(self.semantic_stack.pop())
 
         while (parameters):
             id = parameters.pop()
-            if (id.type == float):
+            if (id.type == "REAL"):
                 self.generate("finp", id)
             else:
                 self.generate("inp", id)
@@ -1045,13 +1077,14 @@ class SemanticAction():
     def action_51WRITE(self, prev_token):
         # For each parameter on the stack in reverse order
         parameters = []
-        while (isinstance(self.peek_stack(), symbol_table.ConstantEntry) or isinstance(self.peek_stack(), symbol_table.VariableEntry)):
+        while (isinstance(self.peek_stack(), symbol_table.ConstantEntry) or
+               isinstance(self.peek_stack(), symbol_table.VariableEntry)):
             parameters.append(self.semantic_stack.pop())
 
         while (parameters):
             id = parameters.pop()
             if (isinstance(id, symbol_table.ConstantEntry)):
-                if (id.type == float):
+                if (id.type == "REAL"):
                     self.generate("finp", id)
                 # id type is int
                 else:
@@ -1059,11 +1092,12 @@ class SemanticAction():
             # id is variable entry
             else:
                 self.generate("print", "\"" + id.name + " = \"")
-                if (id.type == float):
+                if (id.type == "REAL"):
                     self.generate("foutp", id)
                 # id type is int
                 else:
                     self.generate("outp", id)
+            self.generate("new1")
 
         etype = self.semantic_stack.pop()
         id = self.semantic_stack.pop()
@@ -1072,7 +1106,7 @@ class SemanticAction():
     def action_52(self, prev_token):
         etype = self.semantic_stack.pop()
         id = self.semantic_stack.pop()
-        if (not id.isFunction):
+        if (not isinstance(id, symbol_table.FunctionEntry)):
             raise Exception("Id is not function error in action_52")
         if (id.number_of_parameters > 0):
             raise Exception("Wrong number of parameters error in action_52")
@@ -1089,10 +1123,10 @@ class SemanticAction():
 
         if (id.isFunction):
             # Added in final phase
-            if (id != self.currentFunction):
+            if (id != self.current_function):
                 raise Exception("Illegal procedure error in action_53")
-            self.semantic_stack.push(id.getResult())
-            self.semantic_stack.push(EType.ARITHMETIC)
+            self.semantic_stack.append(id.result)
+            self.semantic_stack.append(EType.ARITHMETIC)
             pass
         else:
             self.semantic_stack.append(id)
@@ -1103,7 +1137,7 @@ class SemanticAction():
         id = self.peek_stack()
         self.semantic_stack.append(etype)
 
-        if (not id.isProcedure):
+        if (not isinstance(id, symbol_table.ProcedureEntry)):
             raise Exception("Illegal procedure error in action_54")
 
     def action_55(self, prev_token):
@@ -1126,9 +1160,6 @@ def make_list(element):
     return [element]
 
 
-
 class EType(Enum):
     ARITHMETIC = 1
     RELATIONAL = 2
-
-
